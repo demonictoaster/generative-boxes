@@ -219,7 +219,7 @@ def main():
 	# 	new_cluster = spawn_boxes(loc, np.random.uniform(50, 1000), 0.01, 0.01, 0.05, boxes)
 	# 	boxes += new_cluster
 	boxes += spawn_boxes(np.array([0.5, 0.5]), 2000, 0.01, 0.02, 0.05, boxes)
-	# boxes += spawn_boxes(np.array([0.25, 0.25]), 1000, 0.0008, 0.01, 0.05, boxes)
+	boxes += spawn_boxes(np.array([0.25, 0.25]), 1000, 0.0008, 0.01, 0.05, boxes)
 	# boxes += spawn_boxes(np.array([0.75, 0.75]), 1000, 0.0008, 0.01, 0.05, boxes)
 
 	ctx = create_canvas(params)
@@ -228,8 +228,6 @@ def main():
 	# draw stuff
 	for b in boxes:
 		draw_box(ctx, b)
-
-
 
 if __name__ == "__main__":
 	main()
