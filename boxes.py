@@ -2,6 +2,7 @@ import cairo
 import math
 import numpy as np
 import os
+from tqdm import tqdm
 
 
 """
@@ -13,11 +14,11 @@ params = {
 	'canvas_width': 512,
 	'canvas_height': 512,
 	'bg_colors': np.array([249, 244, 239]) / 255,
-	'n_boxes': 20,
+	'n_boxes': 50,
 	'size_first_box': 0.1,
-	'avg_size': 0.01,
-	'std_size': 0.03,
-	'p_filled': 0.03
+	'avg_size': 0.0003,
+	'std_size': 0.01,
+	'p_filled': 0.05
 }
 
 root = os.path.abspath('')
@@ -102,59 +103,70 @@ def get_corners(center, width, height):
 	p4 = np.array([center[0] + width / 2, center[1] + height / 2])
 	return p1, p2, p3, p4
 
-# first box
-size = params['size_first_box']
-p1, p2, p3, p4 = get_corners(np.array([.5, .5]), size, size)
-boxes = [Box(p1, p2, p3, p4)]
+def spawn_boxes(location, n, avg, std, pfill, prev_boxes):
 
-# spawn more boxes
-for b in range(1, params['n_boxes']):
+	# first box
+	p1, p2, p3, p4 = get_corners(location, avg, avg)
+	boxes = [Box(p1, p2, p3, p4)]
 
-	while True:
-		size = abs(np.random.normal(params['avg_size'], params['std_size']))
-		prev_box = boxes[np.random.randint(len(boxes))]  # pick rdm box
-		side = prev_box.get_random_side()
+	# spawn more boxes
+	for i in tqdm(range(1, n)):
 
-		if side == 'top':
-			p3, p4 = prev_box.p1, prev_box.p2
-			p1 = np.array([p3[0], p3[1] - size])
-			p2 = np.array([p4[0], p4[1] - size])
-			new_box = Box(p1, p2, p3, p4)
-			new_box.neighbors['bot'] = True
+		while True:
+			size = abs(np.random.normal(avg, std))
+			prev_box = boxes[np.random.randint(len(boxes))]  # pick rdm box
+			# prev_box = boxes[i-1]
+			side = prev_box.get_random_side()
+			print(side)
 
-		elif side == 'bot':
-			p1, p2 = prev_box.p3, prev_box.p4
-			p3 = np.array([p1[0], p1[1] + size])
-			p4 = np.array([p2[0], p2[1] + size])
-			new_box = Box(p1, p2, p3, p4)
-			new_box.neighbors['top'] = True
+			if side == 'top':
+				p3, p4 = prev_box.p1, prev_box.p2
+				p1 = np.array([p3[0], p3[1] - size])
+				p2 = np.array([p4[0], p4[1] - size])
+				new_box = Box(p1, p2, p3, p4)
+				new_box.neighbors['bot'] = True
 
-		elif side == 'left':
-			p2, p4 = prev_box.p1, prev_box.p3
-			p1 = np.array([p2[0] - size, p2[1]])
-			p3 = np.array([p4[0] - size, p4[1]])
-			new_box = Box(p1, p2, p3, p4)
-			new_box.neighbors['right'] = True
+			elif side == 'bot':
+				p1, p2 = prev_box.p3, prev_box.p4
+				p3 = np.array([p1[0], p1[1] + size])
+				p4 = np.array([p2[0], p2[1] + size])
+				new_box = Box(p1, p2, p3, p4)
+				new_box.neighbors['top'] = True
 
-		elif side == 'right':
-			p1, p3 = prev_box.p2, prev_box.p4
-			p2 = np.array([p1[0] + size, p1[1]])
-			p4 = np.array([p3[0] + size, p3[1]])
-			new_box = Box(p1, p2, p3, p4)
-			new_box.neighbors['left'] = True
+			elif side == 'left':
+				p2, p4 = prev_box.p1, prev_box.p3
+				p1 = np.array([p2[0] - size, p2[1]])
+				p3 = np.array([p4[0] - size, p4[1]])
+				new_box = Box(p1, p2, p3, p4)
+				new_box.neighbors['right'] = True
 
-		elif side == 0:
-			pass
+			elif side == 'right':
+				p1, p3 = prev_box.p2, prev_box.p4
+				p2 = np.array([p1[0] + size, p1[1]])
+				p4 = np.array([p3[0] + size, p3[1]])
+				new_box = Box(p1, p2, p3, p4)
+				new_box.neighbors['left'] = True
 
-		if overlap(prev_box, new_box) == False:
-			break
+			elif side == 0:
+				pass
 
-		prev_box.neighbors[side] = True
-		print(side)
-		print(new_box.get_coord())
+			# if overlap(prev_box, new_box) == False:
+			# 	break
+			breaches = []
+			for b in (boxes + prev_boxes):
+				breaches.append(overlap(b, new_box))
+			if sum(breaches) == 0:
+				break
+			prev_box.neighbors[side] = True
 
-	boxes.append(new_box)
+		boxes.append(new_box)
 
+		# adapt params as we progress
+		if i % 50 == 0:
+			avg /= 1.01
+			std /= 1.01
+
+	return boxes
 
 def create_canvas(params):
 
@@ -179,7 +191,7 @@ def create_canvas(params):
 
 	return ctx
 
-def draw_rectangle(ctx, box, p_fill = params['p_filled']):
+def draw_box(ctx, box, p_fill = params['p_filled']):
 
 	p1 = box.p1
 	p2 = box.p2
@@ -201,13 +213,21 @@ def draw_rectangle(ctx, box, p_fill = params['p_filled']):
 		ctx.fill()
 
 def main():
+	boxes = []
+	# for i in range(10):
+	# 	loc = np.random.uniform(0.2, 0.8, size=2)
+	# 	new_cluster = spawn_boxes(loc, np.random.uniform(50, 1000), 0.01, 0.01, 0.05, boxes)
+	# 	boxes += new_cluster
+	boxes += spawn_boxes(np.array([0.5, 0.5]), 2000, 0.01, 0.02, 0.05, boxes)
+	# boxes += spawn_boxes(np.array([0.25, 0.25]), 1000, 0.0008, 0.01, 0.05, boxes)
+	# boxes += spawn_boxes(np.array([0.75, 0.75]), 1000, 0.0008, 0.01, 0.05, boxes)
 
 	ctx = create_canvas(params)
 	ctx.set_line_join(cairo.LINE_JOIN_ROUND)
 
 	# draw stuff
 	for b in boxes:
-		draw_rectangle(ctx, b)
+		draw_box(ctx, b)
 
 
 
