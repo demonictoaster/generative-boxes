@@ -108,16 +108,16 @@ def spawn_boxes(location, n, avg, std, pfill, prev_boxes):
 	# first box
 	p1, p2, p3, p4 = get_corners(location, avg, avg)
 	boxes = [Box(p1, p2, p3, p4)]
+	prev_switch = False
 
 	# spawn more boxes
 	for i in tqdm(range(1, n)):
 
 		while True:
-			size = abs(np.random.normal(avg, std))
+			size = max(abs(np.random.normal(avg, std)), 0.001)
 			prev_box = boxes[np.random.randint(len(boxes))]  # pick rdm box
 			# prev_box = boxes[i-1]
 			side = prev_box.get_random_side()
-			print(side)
 
 			if side == 'top':
 				p3, p4 = prev_box.p1, prev_box.p2
@@ -218,8 +218,8 @@ def main():
 	# 	loc = np.random.uniform(0.2, 0.8, size=2)
 	# 	new_cluster = spawn_boxes(loc, np.random.uniform(50, 1000), 0.01, 0.01, 0.05, boxes)
 	# 	boxes += new_cluster
-	boxes += spawn_boxes(np.array([0.5, 0.5]), 2000, 0.01, 0.02, 0.05, boxes)
-	boxes += spawn_boxes(np.array([0.25, 0.25]), 1000, 0.0008, 0.01, 0.05, boxes)
+	boxes += spawn_boxes(np.array([0.5, 0.5]), 500, 0.01, 0.02, 0.02, boxes)
+	# boxes += spawn_boxes(np.array([0.25, 0.25]), 1000, 0.0008, 0.01, 0.05, boxes)
 	# boxes += spawn_boxes(np.array([0.75, 0.75]), 1000, 0.0008, 0.01, 0.05, boxes)
 
 	ctx = create_canvas(params)
