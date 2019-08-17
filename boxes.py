@@ -2,6 +2,7 @@ import cairo
 import math
 import numpy as np
 import os
+import random
 from tqdm import tqdm
 
 
@@ -10,22 +11,22 @@ TODO:
 -
 """
 
-params = {
-	'canvas_width': 512,
-	'canvas_height': 512,
+config = {
+	'canvas_width': 800,
+	'canvas_height': 800,
 	'bg_colors': np.array([249, 244, 239]) / 255,
-	'n_boxes': 50,
-	'size_first_box': 0.1,
-	'avg_size': 0.0003,
-	'std_size': 0.01,
-	'p_filled': 0.05
+	'p_filled': 0.01,
+	'p_drop': 0.0,
+	'p_big': 0.0,
+	'min_size': 0.004,
+	'color': False,
+	'scale': 0.7
 }
 
 root = os.path.abspath('')
 out_folder = root + '/output'
 
 class Box:
-
 	def __init__(self, p1, p2, p3, p4):
 		self.p1 = p1
 		self.p2 = p2
@@ -65,12 +66,11 @@ class Box:
 		coord = np.array([self.p1, self.p2, self.p3, self.p4])
 		return coord
 
-	def center(self):
+	def get_center(self):
 		center = np.array([(self.p1[0] + self.p2[0]) / 2, (self.p1[1] + self.p3[1]) / 2])
 		return center
 
 	def get_random_side(self):
-
 		available = []
 
 		for k in self.neighbors.keys():
@@ -103,7 +103,11 @@ def get_corners(center, width, height):
 	p4 = np.array([center[0] + width / 2, center[1] + height / 2])
 	return p1, p2, p3, p4
 
-def spawn_boxes(location, n, avg, std, pfill, prev_boxes):
+def spawn_boxes(location, n, avg, std, prev_boxes):
+
+	# scaling
+	avg *= config['scale']
+	std *= config['scale']
 
 	# first box
 	p1, p2, p3, p4 = get_corners(location, avg, avg)
@@ -114,7 +118,9 @@ def spawn_boxes(location, n, avg, std, pfill, prev_boxes):
 	for i in tqdm(range(1, n)):
 
 		while True:
-			size = max(abs(np.random.normal(avg, std)), 0.001)
+			size = max(abs(np.random.normal(avg, std)), config['min_size']*config['scale'])
+			if np.random.rand() < config['p_big']:
+				size = random.choice([0.1, 0.2]) * config['scale']
 			prev_box = boxes[np.random.randint(len(boxes))]  # pick rdm box
 			# prev_box = boxes[i-1]
 			side = prev_box.get_random_side()
@@ -168,8 +174,35 @@ def spawn_boxes(location, n, avg, std, pfill, prev_boxes):
 
 	return boxes
 
-def create_canvas(params):
+def is_in_circle(point, center, radius):
+	x_p, y_p = point[0], point[1]
+	x_c, y_c = center[0], center[1]
+	if np.sqrt(abs(x_p - x_c) ** 2 + abs(y_p - y_c) ** 2) < radius:
+		return True
+	else:
+		return False
 
+def make_mask_in(boxes, center, radius, p_keep=0):
+	keep = []
+	for b in boxes:
+		pnt = b.get_center()
+		if not is_in_circle(pnt, center, radius):
+			keep.append(b)
+		if  np.random.rand() < p_keep:
+			keep.append(b)
+	return keep
+
+def make_mask_out(boxes, center, radius, p_keep=0.1):
+	keep = []
+	for b in boxes:
+		pnt = b.get_center()
+		if  is_in_circle(pnt, center, radius):
+			keep.append(b)
+		if  np.random.rand() < p_keep:
+			keep.append(b)
+	return keep
+
+def create_canvas(params):
 	canvas_width = params['canvas_width']
 	canvas_height = params['canvas_height']
 	bg_colors = params['bg_colors']
@@ -186,13 +219,12 @@ def create_canvas(params):
 	ctx.fill()
 
 	# scale space axes and other
-	ctx.scale(canvas_width, canvas_height)    
+	ctx.scale(canvas_width, canvas_height)
 	ctx.set_source_rgb(0,0,0)
 
 	return ctx
 
-def draw_box(ctx, box, p_fill = params['p_filled']):
-
+def draw_box(ctx, box, p_fill = config['p_filled']):
 	p1 = box.p1
 	p2 = box.p2
 	p3 = box.p3
@@ -203,30 +235,43 @@ def draw_box(ctx, box, p_fill = params['p_filled']):
 	ctx.line_to(p4[0], p4[1])
 	ctx.line_to(p3[0], p3[1])
 	ctx.line_to(p1[0], p1[1])
-	ctx.stroke()
-	if np.random.rand() < p_fill:
-		ctx.move_to(p1[0], p1[1])
-		ctx.line_to(p2[0], p2[1])
-		ctx.line_to(p4[0], p4[1])
-		ctx.line_to(p3[0], p3[1])
-		ctx.line_to(p1[0], p1[1])
+
+	if config['color']:
+		colors = [[229, 31, 40], [46, 49, 146], [1, 184, 236]]
+		rdm = random.choice(colors)
+		ctx.set_source_rgb(rdm[0] / 255, rdm[1] / 255, rdm[2] / 255)
+		ctx.stroke_preserve()
 		ctx.fill()
+	else:
+		ctx.stroke()
+		if np.random.rand() < p_fill:
+			ctx.move_to(p1[0], p1[1])
+			ctx.line_to(p2[0], p2[1])
+			ctx.line_to(p4[0], p4[1])
+			ctx.line_to(p3[0], p3[1])
+			ctx.line_to(p1[0], p1[1])
+			ctx.fill()
+
+
 
 def main():
-	boxes = []
-	# for i in range(10):
-	# 	loc = np.random.uniform(0.2, 0.8, size=2)
-	# 	new_cluster = spawn_boxes(loc, np.random.uniform(50, 1000), 0.01, 0.01, 0.05, boxes)
-	# 	boxes += new_cluster
-	boxes += spawn_boxes(np.array([0.5, 0.5]), 500, 0.01, 0.02, 0.02, boxes)
-	# boxes += spawn_boxes(np.array([0.25, 0.25]), 1000, 0.0008, 0.01, 0.05, boxes)
-	# boxes += spawn_boxes(np.array([0.75, 0.75]), 1000, 0.0008, 0.01, 0.05, boxes)
+	boxes = spawn_boxes(np.array([0.5, 0.5]), 12000, 0.01, 0.02, [])
 
-	ctx = create_canvas(params)
+	# apply mask
+	# boxes = make_mask_in(boxes, [0.5, 0.5], 0.2, p_keep=0)
+	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.48, p_keep=0)
+	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.45, p_keep=0.3)
+	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.42, p_keep=0.6)
+	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.40, p_keep=0.6)
+
+	# draw
+	ctx = create_canvas(config)
 	ctx.set_line_join(cairo.LINE_JOIN_ROUND)
 
 	# draw stuff
 	for b in boxes:
+		if np.random.rand() < config['p_drop']:
+			continue
 		draw_box(ctx, b)
 
 if __name__ == "__main__":
