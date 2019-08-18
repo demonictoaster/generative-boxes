@@ -2,7 +2,7 @@
 Simple generative algorithm that spawns random boxes and draws them to an SVG file. 
 
 # Example
-![alt text](https://raw.githubusercontent.com/demonictoaster/generative-boxes/blob/master/examples/2.png)
+![alt text](https://github.com/demonictoaster/generative-boxes/blob/master/examples/2.png)
 
 # Dependencies
 * `cairo`
