@@ -6,17 +6,12 @@ import random
 from tqdm import tqdm
 
 
-"""
-TODO: 
--
-"""
-
 config = {
 	'canvas_width': 800,
 	'canvas_height': 800,
 	'bg_colors': np.array([249, 244, 239]) / 255,
 	'p_filled': 0.01,
-	'p_drop': 0.0,
+	'p_drop': 0.3,
 	'p_big': 0.0,
 	'min_size': 0.004,
 	'color': False,
@@ -252,17 +247,11 @@ def draw_box(ctx, box, p_fill = config['p_filled']):
 			ctx.line_to(p1[0], p1[1])
 			ctx.fill()
 
-
-
 def main():
 	boxes = spawn_boxes(np.array([0.5, 0.5]), 12000, 0.01, 0.02, [])
 
 	# apply mask
 	# boxes = make_mask_in(boxes, [0.5, 0.5], 0.2, p_keep=0)
-	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.48, p_keep=0)
-	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.45, p_keep=0.3)
-	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.42, p_keep=0.6)
-	# boxes = make_mask_out(boxes, [0.5, 0.5], 0.40, p_keep=0.6)
 
 	# draw
 	ctx = create_canvas(config)
@@ -276,4 +265,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-	pass
